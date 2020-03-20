@@ -3,6 +3,9 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: Microtrader Stack
 
 Parameters:
+  EcsTaskRunnerVersion:
+    Type: String
+    Description: S3 Object Version of CloudFormation ECS Tasks function
   MicrotraderImage:
     Type: String
     Description: Microtrader Docker Image Registry/Organization Base URI
@@ -87,15 +90,211 @@ Conditions:
       - 1
 
 Resources:
-  MyFirstCustomReource:
+  ClusterSecret:
     Type: AWS::CloudFormation::CustomResource
     Properties:
-      ServiceToken: arn:aws:lambda:ap-northeast-1:398099758646:function:myFirstCustomResource
+      ServiceToken:
+        Fn::Sub: ${SecretsProvisioner.Arn}
+      Name:
+        Fn::Sub: /${AWS::StackName}/cluster/password
+      Key: CLUSTER_GROUP_PASSWORD
+      KmsKeyId:
+        Fn::ImportValue: CfnMasterKey
+      Trigger: 1
+  DatabaseSecret:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken:
+        Fn::Sub: ${SecretsProvisioner.Arn}
+      Name:
+        Fn::Sub: /${AWS::StackName}/database/password
+      Key: JDBC_PASSWORD
+      Value: AQICAHhWGc7thollN6f7zbhA0gIJLbqZuXClFf2SKmIcZaTB3AGWRh+J5DzPy6Yv3olUMORRAAAAczBxBgkqhkiG9w0BBwagZDBiAgEAMF0GCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM78X9YQxG0AAZ71RmAgEQgDDLeazAs4iP1ICjGCbx1DQQ7keeMCnW24L0mV6Ia8AvrNzHFlXT1keuaumcWntEHZE=
+      KmsKeyId:
+        Fn::ImportValue: CfnMasterKey
+  SecretsProvisionerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action:
+            - sts:AssumeRole
+      Policies:
+        - PolicyName: SecretsProvisionerPermissions
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+            - Sid: ProvisionSecrets
+              Effect: Allow
+              Action:
+              - ssm:GetParameters
+              - ssm:PutParameter
+              - ssm:DeleteParameter
+              - ssm:AddTagsToResource
+              - ssm:ListTagsForResource
+              Resource:
+                Fn::Sub: arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/*
+            - Sid: Encrypt
+              Effect: Allow
+              Action:
+              - kms:Decrypt
+              - kms:Encrypt
+              Resource:
+                Fn::ImportValue: CfnMasterKeyArn
+            - Sid: ManageLambdaLogs
+              Effect: Allow
+              Action:
+              - logs:CreateLogStream
+              - logs:DescribeLogStreams
+              - logs:PutLogEvents
+              Resource:
+                Fn::Sub: ${SecretsProvisionerLogGroup.Arn}
+  SecretsProvisioner:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - SecretsProvisionerLogGroup
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-secretsProvisioner
+      Description:
+        Fn::Sub: ${AWS::StackName} Secrets Provisioner
+      Handler: secrets_provisioner.handler
+      MemorySize: 128
+      Runtime: python2.7
+      Timeout: 300
+      Code:
+        S3Bucket:
+          Fn::Sub: ${AWS::AccountId}-cfn-lambda
+        S3Key: secretsProvisioner.zip
+      Role:
+        Fn::Sub: ${SecretsProvisionerRole.Arn}
+  SecretsProvisionerLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName:
+        Fn::Sub: /aws/lambda/${AWS::StackName}-secretsProvisioner
+      RetentionInDays:
+        Ref: LogRetention  EcsTaskRunnerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action:
+            - sts:AssumeRole
+      Policies:
+        - PolicyName: EcsTaskRunnerPermissions
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+            - Sid: InvokeSelf
+              Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource:
+                Fn::Sub: arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${AWS::StackName}-ecsTasks
+            - Sid: EcsTasks
+              Effect: Allow
+              Action:
+              - ecs:DescribeTasks
+              - ecs:ListTasks
+              - ecs:RunTask
+              - ecs:StartTask
+              - ecs:StopTask
+              - ecs:DescribeContainerInstances
+              - ecs:ListContainerInstances
+              Resource: "*"
+              Condition:
+                ArnEquals:
+                  ecs:cluster:
+                    Fn::Sub: arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:cluster/${ApplicationCluster}
+            - Sid: ManageLambdaLogs
+              Effect: Allow
+              Action:
+              - logs:CreateLogStream
+              - logs:DescribeLogStreams
+              - logs:PutLogEvents
+              Resource:
+                Fn::Sub:
+                  arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-ecsTasks:*:*
+
+  EcsTaskRunner:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - EcsTaskRunnerLogGroup
+    Properties:
+      FunctionName:
+        Fn::Sub: ${AWS::StackName}-ecsTasks
+      Description:
+        Fn::Sub: ${AWS::StackName} ECS Task Runner
+      Handler: ecs_tasks.handler
+      MemorySize: 128
+      Runtime: python2.7
+      Timeout: 300
+      Code:
+        S3Bucket:
+          Fn::Sub: ${AWS::AccountId}-cfn-lambda
+        S3Key: ecsTasks.zip
+        S3ObjectVersion:
+          Ref: EcsTaskRunnerVersion
+      Role:
+        Fn::Sub: ${EcsTaskRunnerRole.Arn}
+  EcsTaskRunnerLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName:
+        Fn::Sub: /aws/lambda/${AWS::StackName}-ecsTasks
+      RetentionInDays:
+        Ref: LogRetention
+  MigrateTask:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn:
+      - ApplicationAutoscaling
+      - ApplicationDatabase
+    Properties:
+      ServiceToken:
+        Fn::Sub: ${EcsTaskRunner.Arn}
       Cluster:
         Ref: ApplicationCluster
       TaskDefinition:
         Ref: MigrateTaskDefinition
-
+      RunOnUpdate: "true"
+  MigrateTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: SSMSecrets
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                - ssm:GetParameters
+                Resource:
+                  - Fn::Sub: arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/database/password
+              - Effect: Allow
+                Action:
+                - kms:Decrypt
+                Resource:
+                  Fn::ImportValue: CfnMasterKeyArn
 
   MigrateTaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -206,6 +405,7 @@ Resources:
       - AuditServiceLogGroup
       - ApplicationLoadBalancerHttpListener
       - ApplicationDatabase
+      - MigrateTask
     Properties:
       LoadBalancers:
         - ContainerName: audit
