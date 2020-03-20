@@ -98,6 +98,7 @@ Resources:
       Name:
         Fn::Sub: /${AWS::StackName}/cluster/password
       Key: CLUSTER_GROUP_PASSWORD
+      Value: AQICAHhWGc7thollN6f7zbhA0gIJLbqZuXClFf2SKmIcZaTB3AGWRh+J5DzPy6Yv3olUMORRAAAAczBxBgkqhkiG9w0BBwagZDBiAgEAMF0GCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM78X9YQxG0AAZ71RmAgEQgDDLeazAs4iP1ICjGCbx1DQQ7keeMCnW24L0mV6Ia8AvrNzHFlXT1keuaumcWntEHZE=
       KmsKeyId:
         Fn::ImportValue: CfnMasterKey
       Trigger: 1
@@ -109,7 +110,8 @@ Resources:
       Name:
         Fn::Sub: /${AWS::StackName}/database/password
       Key: JDBC_PASSWORD
-      Value: AQICAHhWGc7thollN6f7zbhA0gIJLbqZuXClFf2SKmIcZaTB3AGWRh+J5DzPy6Yv3olUMORRAAAAczBxBgkqhkiG9w0BBwagZDBiAgEAMF0GCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM78X9YQxG0AAZ71RmAgEQgDDLeazAs4iP1ICjGCbx1DQQ7keeMCnW24L0mV6Ia8AvrNzHFlXT1keuaumcWntEHZE=
+      Value:
+        Ref:DatabasePassword
       KmsKeyId:
         Fn::ImportValue: CfnMasterKey
   SecretsProvisionerRole:
@@ -179,7 +181,8 @@ Resources:
       LogGroupName:
         Fn::Sub: /aws/lambda/${AWS::StackName}-secretsProvisioner
       RetentionInDays:
-        Ref: LogRetention  EcsTaskRunnerRole:
+        Ref: LogRetention
+  EcsTaskRunnerRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -313,15 +316,25 @@ Resources:
             - /app/app.jar
             - com.pluralsight.dockerproductionaws.admin.Migrate
           Environment:
+            - Name: SSM_SECRETS
+              Value:
+                Fn::Sub: /${AWS::StackName}/database/password
+            - Name: SSM_VERSIONS
+              Value:
+                Fn::Sub: ${DatabaseSecret}
+            - Name: AWS_DEFAULT_REGION
+              Value:
+                Ref: AWS::Region
+            - Name: HTTPS_PROXY
+              Value:
+                Fn::ImportValue:
+                  Fn::Sub: ${VpcName}ProxyUrl
             - Name: JDBC_URL
               Value:
                 Fn::Sub: jdbc:mysql://${ApplicationDatabase.Endpoint.Address}/${DatabaseName}?useSSL=false
             - Name: JDBC_USER
               Value:
                 Ref: DatabaseUsername
-            - Name: JDBC_PASSWORD
-              Value:
-                Ref: DatabasePassword
             - Name: JDBC_DRIVERCLASS
               Value: com.mysql.jdbc.Driver
             - Name: DB_MIGRATIONS_LOCATION
@@ -482,15 +495,25 @@ Resources:
           Memory: 800
           Cpu: 200
           Environment:
+            - Name: SSM_SECRETS
+              Value:
+                Fn::Sub: /${AWS::StackName}/database/password /${AWS::StackName}/cluster/password
+            - Name: SSM_VERSIONS
+              Value:
+                Fn::Sub: ${DatabaseSecret} ${ClusterSecret}
+            - Name: AWS_DEFAULT_REGION
+              Value:
+                Ref: AWS::Region
+            - Name: HTTPS_PROXY
+              Value:
+                Fn::ImportValue:
+                  Fn::Sub: ${VpcName}ProxyUrl
             - Name: JDBC_URL
               Value:
                 Fn::Sub: jdbc:mysql://${ApplicationDatabase.Endpoint.Address}/${DatabaseName}?useSSL=false
             - Name: JDBC_USER
               Value:
                 Ref: DatabaseUsername
-            - Name: JDBC_PASSWORD
-              Value:
-                Ref: DatabasePassword
             - Name: JDBC_DRIVERCLASS
               Value: com.mysql.jdbc.Driver
             - Name: HTTP_PORT
@@ -506,8 +529,6 @@ Resources:
             - Name: CLUSTER_GROUP_NAME
               Value:
                 Ref: ApplicationCluster
-            - Name: CLUSTER_GROUP_PASSWORD
-              Value: super-secret-password
             - Name: CLUSTER_AWS_ENABLED
               Value: "true"
             - Name: CLUSTER_AWS_REGION
@@ -562,11 +583,22 @@ Resources:
           Memory: 800
           Cpu: 200
           Environment:
+            - Name: SSM_SECRETS
+              Value:
+                Fn::Sub: /${AWS::StackName}/cluster/password
+            - Name: SSM_VERSIONS
+              Value:
+                Fn::Sub: ${ClusterSecret}
+            - Name: AWS_DEFAULT_REGION
+              Value:
+                Ref: AWS::Region
+            - Name: HTTPS_PROXY
+              Value:
+                Fn::ImportValue:
+                  Fn::Sub: ${VpcName}ProxyUrl
             - Name: CLUSTER_GROUP_NAME
               Value:
                 Ref: ApplicationCluster
-            - Name: CLUSTER_GROUP_PASSWORD
-              Value: super-secret-password
             - Name: CLUSTER_AWS_ENABLED
               Value: "true"
             - Name: CLUSTER_AWS_REGION
@@ -620,14 +652,25 @@ Resources:
           Memory: 800
           Cpu: 200
           Environment:
+            - Name: SSM_SECRETS
+              Value:
+                Fn::Sub: /${AWS::StackName}/cluster/password
+            - Name: SSM_VERSIONS
+              Value:
+                Fn::Sub: ${ClusterSecret}
+            - Name: AWS_DEFAULT_REGION
+              Value:
+                Ref: AWS::Region
+            - Name: HTTPS_PROXY
+              Value:
+                Fn::ImportValue:
+                  Fn::Sub: ${VpcName}ProxyUrl
             - Name: HTTP_PORT
               Value:
                 Ref: MicrotraderDashboardHttpPort
             - Name: CLUSTER_GROUP_NAME
               Value:
                 Ref: ApplicationCluster
-            - Name: CLUSTER_GROUP_PASSWORD
-              Value: super-secret-password
             - Name: CLUSTER_AWS_ENABLED
               Value: "true"
             - Name: CLUSTER_AWS_REGION
@@ -703,6 +746,19 @@ Resources:
                 Ref: AWS::Region
               awslogs-stream-prefix: docker
           Environment:
+            - Name: SSM_SECRETS
+              Value:
+                Fn::Sub: /${AWS::StackName}/cluster/password
+            - Name: SSM_VERSIONS
+              Value:
+                Fn::Sub: ${ClusterSecret}
+            - Name: AWS_DEFAULT_REGION
+              Value:
+                Ref: AWS::Region
+            - Name: HTTPS_PROXY
+              Value:
+                Fn::ImportValue:
+                  Fn::Sub: ${VpcName}ProxyUrl
             - Name: HTTP_PORT
               Value:
                 Ref: MicrotraderQuoteHttpPort
@@ -728,8 +784,6 @@ Resources:
             - Name: CLUSTER_GROUP_NAME
               Value:
                 Ref: ApplicationCluster
-            - Name: CLUSTER_GROUP_PASSWORD
-              Value: super-secret-password
             - Name: JAVA_TOOL_OPTIONS
               Value:
                 Fn::Join: ["", [
@@ -879,7 +933,7 @@ Resources:
       MasterUsername:
         Ref: DatabaseUsername
       MasterUserPassword:
-        Ref: DatabasePassword
+        Fn::Sub: ${DatabaseSecret.Value}
       DBName:
         Ref: DatabaseName
       VPCSecurityGroups:
@@ -1167,6 +1221,20 @@ Resources:
             Action:
               - sts:AssumeRole
       Policies:
+        - PolicyName: SSMSecrets
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                - ssm:GetParameters
+                Resource:
+                  - Fn::Sub: arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/*
+              - Effect: Allow
+                Action:
+                - kms:Decrypt
+                Resource:
+                  Fn::ImportValue: CfnMasterKeyArn
         - PolicyName: ECSContainerInstancePolicy
           PolicyDocument:
             Version: "2012-10-17"

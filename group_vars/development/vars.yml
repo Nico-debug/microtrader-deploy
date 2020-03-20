@@ -2,7 +2,7 @@
 Sts.Role: arn:aws:iam::398099758646:role/Admin
 
 # Stack settings
-Stack.Name: microtrader-development3
+Stack.Name: microtrader-development
 Stack.Description: Microtrader Stack - Development
 
 # Override all deletion policies of type AWS::RDS::DBInstance
@@ -21,7 +21,7 @@ Stack.Inputs.MicrotraderDashboardHttpPort: 8002
 # Database settings
 Stack.Inputs.DatabaseName: audit
 Stack.Inputs.DatabaseUsername: audit
-Stack.Inputs.DatabasePassword: super-secret-password
+Stack.Inputs.DatabasePassword: AQICAHhWGc7thollN6f7zbhA0gIJLbqZuXClFf2SKmIcZaTB3AGWRh+J5DzPy6Yv3olUMORRAAAAczBxBgkqhkiG9w0BBwagZDBiAgEAMF0GCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM78X9YQxG0AAZ71RmAgEQgDDLeazAs4iP1ICjGCbx1DQQ7keeMCnW24L0mV6Ia8AvrNzHFlXT1keuaumcWntEHZE=
 # Application settings
 Stack.Inputs.ApplicationDnsName: dev-microtrader
 Stack.Inputs.ApplicationImageId: ami-098251b61b80a478a
