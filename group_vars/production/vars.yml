@@ -23,7 +23,7 @@ Stack.Inputs.DatabaseName: audit
 Stack.Inputs.DatabaseUsername: audit
 Stack.Inputs.DatabasePassword: AQICAHhWGc7thollN6f7zbhA0gIJLbqZuXClFf2SKmIcZaTB3AGWRh+J5DzPy6Yv3olUMORRAAAAczBxBgkqhkiG9w0BBwagZDBiAgEAMF0GCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM78X9YQxG0AAZ71RmAgEQgDDLeazAs4iP1ICjGCbx1DQQ7keeMCnW24L0mV6Ia8AvrNzHFlXT1keuaumcWntEHZE=
 # Application settings
-Stack.Inputs.ApplicationDnsName: dev-microtrader
+Stack.Inputs.ApplicationDnsName: prod-microtrader
 Stack.Inputs.ApplicationImageId: ami-0a6e79fab362a22d0
 Stack.Inputs.ApplicationKeyName: admin
 
